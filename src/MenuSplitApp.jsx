@@ -1,0 +1,1 @@
+<your full MenuSplitApp.jsx canvas content here>
