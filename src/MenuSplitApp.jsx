@@ -1,57 +1,55 @@
 
-// menu-split-app
-// Uitgebreide versie met mogelijkheid om meerdere stuks per item te selecteren en vrienden toe te voegen of te verwijderen.
-
-import React, { useState } from "react";
-import { useEffect } from "react";
+// React + Tailwind versie van de Menu Split App
+import React, { useState, useEffect } from "react";
 
 const exampleOCRText = `Cola 2.50\nPils 2.80\nWitte wijn 4.00\nSpa rood 2.20\nKoffie 3.00`;
 
 export default function MenuSplitApp() {
   const [menuText, setMenuText] = useState(exampleOCRText);
-  const [imageFile, setImageFile] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
-  const [selections, setSelections] = useState({});
   const [friends, setFriends] = useState([]);
-  const [newFriend, setNewFriend] = useState("");
+  const [selections, setSelections] = useState({});
   const [payer, setPayer] = useState("");
+  const [newFriend, setNewFriend] = useState("");
+
+  useEffect(() => {
+    parseMenu();
+  }, []);
 
   const parseMenu = () => {
     const lines = menuText.split("\n");
     const items = lines.map((line) => {
       const match = line.match(/(.+)\s(\d+[\.,]?\d{0,2})/);
-      if (match) return { item: match[1], price: parseFloat(match[2].replace(",", ".")) };
-      return null;
+      return match ? { item: match[1], price: parseFloat(match[2].replace(",", ".")) } : null;
     }).filter(Boolean);
     setMenuItems(items);
   };
 
-  const addItemForFriend = (friend, item) => {
-    setSelections((prev) => {
-      const current = prev[friend] || {};
-      const count = current[item.item] || 0;
-      return {
-        ...prev,
-        [friend]: {
-          ...current,
-          [item.item]: count + 1
-        }
-      };
-    });
+  const addFriend = () => {
+    if (newFriend && !friends.includes(newFriend)) {
+      setFriends([...friends, newFriend]);
+      setSelections({ ...selections, [newFriend]: {} });
+      if (!payer) setPayer(newFriend);
+      setNewFriend("");
+    }
   };
 
-  const removeItemForFriend = (friend, item) => {
-    setSelections((prev) => {
-      const current = prev[friend] || {};
-      const count = current[item.item] || 0;
-      if (count <= 0) return prev;
-      return {
-        ...prev,
-        [friend]: {
-          ...current,
-          [item.item]: count - 1
-        }
-      };
+  const removeFriend = (name) => {
+    const updatedFriends = friends.filter((f) => f !== name);
+    const updatedSelections = { ...selections };
+    delete updatedSelections[name];
+    setFriends(updatedFriends);
+    setSelections(updatedSelections);
+    if (payer === name) setPayer(updatedFriends[0] || "");
+  };
+
+  const toggleItem = (friend, item, change) => {
+    const friendSelections = selections[friend] || {};
+    const current = friendSelections[item] || 0;
+    const updated = Math.max(0, current + change);
+    setSelections({
+      ...selections,
+      [friend]: { ...friendSelections, [item]: updated },
     });
   };
 
@@ -59,128 +57,110 @@ export default function MenuSplitApp() {
     const totals = {};
     friends.forEach((friend) => {
       const items = selections[friend] || {};
-      const total = Object.entries(items).reduce((sum, [itemName, count]) => {
-        const found = menuItems.find((i) => i.item === itemName);
-        return sum + (found ? found.price * count : 0);
+      totals[friend] = Object.entries(items).reduce((sum, [item, qty]) => {
+        const found = menuItems.find((m) => m.item === item);
+        return sum + (found ? found.price * qty : 0);
       }, 0);
-      totals[friend] = total.toFixed(2);
     });
     return totals;
   };
 
-  const handleAddFriend = () => {
-    if (newFriend && !friends.includes(newFriend)) {
-      setFriends([...friends, newFriend]);
-      setNewFriend("");
-    }
-  };
-
-  const handleRemoveFriend = (friendToRemove) => {
-    setFriends((prev) => prev.filter((f) => f !== friendToRemove));
-    setSelections((prev) => {
-      const updated = { ...prev };
-      delete updated[friendToRemove];
-      return updated;
-    });
-    if (payer === friendToRemove && friends.length > 1) {
-      setPayer(friends.find((f) => f !== friendToRemove));
-    }
-  };
-
   const totals = calculateTotals();
 
-  useEffect(() => {
-    parseMenu();
-  }, []);
-
   return (
-    <div className="p-4 max-w-3xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold">🍽️ Menu Split App</h1>
+    <div className="max-w-3xl mx-auto p-4 space-y-6">
+      <h1 className="text-3xl font-bold">🍽️ Menu Split App</h1>
 
-      <div className="border rounded-lg shadow-sm">
-        <div className="p-4 space-y-2">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImageFile(e.target.files[0])}
-          />
-          <textarea
-            className="w-full border p-2 rounded"
-            value={menuText}
-            onChange={(e) => setMenuText(e.target.value)}
-            placeholder="Plak hier de OCR-resultaten van de menukaart"
-          />
-          <button className="px-2 py-1 border rounded" onClick={parseMenu}>Menu inladen</button>
-          {imageFile && (
-            <p className="text-sm">Geselecteerde afbeelding: {imageFile.name}</p>
-          )}
-        </div>
+      <div className="border p-4 rounded-lg space-y-2">
+        <label className="font-medium">Menukaart (tekst)</label>
+        <textarea
+          className="w-full border rounded p-2"
+          rows="4"
+          value={menuText}
+          onChange={(e) => setMenuText(e.target.value)}
+        ></textarea>
+        <button
+          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          onClick={parseMenu}
+        >
+          Menu inladen
+        </button>
       </div>
 
-      <div className="border rounded-lg shadow-sm">
-        <div className="p-4 space-y-2">
-          <div className="flex gap-2">
-            <input
-              className="border px-2 py-1 rounded"
-              value={newFriend}
-              onChange={(e) => setNewFriend(e.target.value)}
-              placeholder="Nieuwe vriend toevoegen"
-            />
-            <button className="px-2 py-1 border rounded" onClick={handleAddFriend}>Toevoegen</button>
-          </div>
-
-          <label className="block text-sm font-medium">Selecteer betaler:</label>
-          <select disabled={friends.length === 0} className="w-full border rounded px-2 py-1" value={payer} onChange={(e) => setPayer(e.target.value)}>
-            <option value="">-- Kies een vriend --</option>
-            {friends.map((friend) => (
-              <option key={friend} value={friend}>{friend}</option>
+      <div className="border p-4 rounded-lg space-y-2">
+        <label className="font-medium">Nieuwe vriend toevoegen</label>
+        <input
+          className="w-full border rounded p-2"
+          value={newFriend}
+          onChange={(e) => setNewFriend(e.target.value)}
+          placeholder="Naam vriend"
+        />
+        <button
+          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+          onClick={addFriend}
+        >
+          Toevoegen
+        </button>
+        <div>
+          <label className="block mt-2">Betaler:</label>
+          <select
+            className="w-full border rounded p-2"
+            value={payer}
+            onChange={(e) => setPayer(e.target.value)}
+          >
+            {friends.map((f) => (
+              <option key={f} value={f}>{f}</option>
             ))}
           </select>
         </div>
       </div>
 
-      {menuItems.length > 0 && (
-        <div className="space-y-4">
-          {friends.map((friend) => (
-            <div key={friend} className="border rounded-lg shadow-sm">
-              <div className="p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <h2 className="font-semibold text-lg">{friend}</h2>
-                  <button className="px-2 py-1 border rounded" onClick={() => handleRemoveFriend(friend)}>
-                    Verwijder
+      {friends.map((friend) => (
+        <div key={friend} className="border p-4 rounded-lg">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-xl font-semibold">{friend}</h2>
+            <button
+              className="text-red-500 hover:underline"
+              onClick={() => removeFriend(friend)}
+            >
+              Verwijder
+            </button>
+          </div>
+          {menuItems.map((item) => {
+            const qty = selections[friend]?.[item.item] || 0;
+            return (
+              <div
+                key={item.item}
+                className="flex justify-between items-center border-b py-2"
+              >
+                <span>{item.item} (€{item.price.toFixed(2)})</span>
+                <div className="flex gap-2 items-center">
+                  <button
+                    className="border px-2 rounded"
+                    onClick={() => toggleItem(friend, item.item, -1)}
+                  >
+                    -
+                  </button>
+                  <span>{qty}</span>
+                  <button
+                    className="border px-2 rounded"
+                    onClick={() => toggleItem(friend, item.item, 1)}
+                  >
+                    +
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                  {menuItems.map((item) => (
-                    <div key={item.item} className="flex items-center justify-between gap-2 border p-2 rounded-md">
-                      <span>{item.item} (€{item.price.toFixed(2)})</span>
-                      <div className="flex items-center gap-1">
-                        <button className="px-2 py-1 border rounded" onClick={() => removeItemForFriend(friend, item)}>-</button>
-                        <span>{selections[friend]?.[item.item] || 0}</span>
-                        <button className="px-2 py-1 border rounded" onClick={() => addItemForFriend(friend, item)}>+</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
-            </div>
-          ))}
-
-          <div className="border rounded-lg shadow-sm">
-            <div className="p-4">
-              <h2 className="text-lg font-semibold">💸 Terugbetaling</h2>
-              <p>Betaler: <strong>{payer}</strong></p>
-              <div className="space-y-1 mt-2">
-                {Object.entries(totals).map(([name, total]) => (
-                  name !== payer && (
-                    <p key={name}>{name} moet €{total} betalen aan {payer}</p>
-                  )
-                ))}
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
-      )}
+      ))}
+
+      <div className="border p-4 rounded-lg">
+        <h2 className="text-xl font-semibold mb-2">💸 Terugbetaling</h2>
+        {friends.filter((f) => f !== payer).map((f) => (
+          <p key={f}>{f} moet €{totals[f].toFixed(2)} betalen aan {payer}</p>
+        ))}
+      </div>
     </div>
   );
 }
